@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meopel Admin — Occasions</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #222; }
+    header { background: #6C63FF; color: white; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 20px; }
+    .key-bar { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 10px 24px; display: flex; gap: 8px; align-items: center; }
+    .key-bar input { border: 1px solid #ccc; border-radius: 6px; padding: 6px 10px; width: 260px; font-size: 13px; }
+    .key-bar button { background: #6C63FF; color: white; border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 13px; }
+    .container { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    .card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 24px; margin-bottom: 24px; }
+    h2 { font-size: 16px; margin-bottom: 16px; color: #444; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; }
+    input, select { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+    .btn { border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500; }
+    .btn-primary { background: #6C63FF; color: white; }
+    .btn-danger { background: #ff4d4d; color: white; padding: 4px 10px; font-size: 12px; }
+    .btn-toggle { background: #e8f5e9; color: #388e3c; padding: 4px 10px; font-size: 12px; }
+    .btn-toggle.inactive { background: #fce4ec; color: #c62828; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #eee; color: #666; font-weight: 600; }
+    td { padding: 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    tr:hover td { background: #fafafa; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge-outdoor { background: #e8f5e9; color: #2e7d32; }
+    .badge-sports { background: #e3f2fd; color: #1565c0; }
+    .badge-food { background: #fff3e0; color: #e65100; }
+    .badge-culture { background: #f3e5f5; color: #6a1b9a; }
+    .actions { display: flex; gap: 6px; }
+    .msg { padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
+    .msg-success { background: #e8f5e9; color: #2e7d32; }
+    .msg-error { background: #fce4ec; color: #c62828; }
+    .days { font-size: 11px; color: #888; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>🗓️</div>
+  <h1>Meopel Admin — Occasions</h1>
+</header>
+
+<div class="key-bar">
+  <label style="margin:0; font-size:13px;">Server:</label>
+  <input type="text" id="serverUrl" value="http://localhost:3000" style="width:200px;" />
+  <label style="margin:0; font-size:13px;">Admin Key:</label>
+  <input type="password" id="adminKey" placeholder="Enter admin key" />
+  <button onclick="loadOccasions()">Load</button>
+</div>
+
+<div class="container">
+  <div id="msg"></div>
+
+  <!-- Add Recurring Plan -->
+  <div class="card">
+    <h2>Add Recurring Plan</h2>
+    <div class="form-grid">
+      <div class="full">
+        <label>Activity</label>
+        <input id="f-activity" placeholder="e.g. Morning Walk, Coffee, Badminton" />
+      </div>
+      <div class="full">
+        <label>Place</label>
+        <input id="f-place" placeholder="Search a place..." oninput="searchPlaces(this.value)" autocomplete="off" />
+        <div id="place-suggestions" style="background:white; border:1px solid #ddd; border-radius:8px; margin-top:4px; display:none;"></div>
+      </div>
+      <div>
+        <label>Recurrence Type</label>
+        <select id="f-recurrence-type" onchange="updateRecurrenceFields()">
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="fortnightly">Fortnightly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div id="f-day-wrap">
+        <label>Day of Week (0=Sun … 6=Sat)</label>
+        <input id="f-day" type="number" min="0" max="6" placeholder="e.g. 0 for Sunday" />
+      </div>
+      <div id="f-weekofmonth-wrap" style="display:none;">
+        <label>Week of Month (1=first, 2=second…)</label>
+        <input id="f-weekofmonth" type="number" min="1" max="4" placeholder="e.g. 1" />
+      </div>
+      <div id="f-dateofmonth-wrap" style="display:none;">
+        <label>Date of Month (1–31, leave blank to use day+week)</label>
+        <input id="f-dateofmonth" type="number" min="1" max="31" placeholder="e.g. 15" />
+      </div>
+      <div>
+        <label>Hour (24hr)</label>
+        <input id="f-hour" type="number" min="0" max="23" placeholder="e.g. 7" />
+      </div>
+      <div>
+        <label>Minute</label>
+        <input id="f-minute" type="number" min="0" max="59" value="0" />
+      </div>
+      <div class="full">
+        <label>Exclude Days (comma separated, 0=Sun…6=Sat, e.g. 0,6 to skip weekends)</label>
+        <input id="f-excludedays" placeholder="e.g. 0,6" />
+      </div>
+      <div>
+        <label>Budget</label>
+        <select id="f-budget">
+          <option value="budget-friendly">Budget-friendly</option>
+          <option value="mid-range">Mid-range</option>
+          <option value="splurge">Splurge</option>
+        </select>
+      </div>
+      <div>
+        <label>Start Date</label>
+        <input id="f-startdate" type="date" />
+      </div>
+    </div>
+    <br>
+    <button class="btn btn-primary" onclick="addOccasion()">Add Recurring Plan</button>
+  </div>
+
+  <!-- Occasions List -->
+  <div class="card">
+    <h2>All Occasions <span id="count" style="color:#aaa; font-weight:normal;"></span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Activity</th>
+          <th>Place</th>
+          <th>Schedule</th>
+          <th>Budget</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="occasions-list">
+        <tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let _placeDebounce = null;
+  let _selectedPlace = null;
+
+  function searchPlaces(val) {
+    _selectedPlace = null;
+    clearTimeout(_placeDebounce);
+    const box = document.getElementById('place-suggestions');
+    if (val.length < 2) { box.style.display = 'none'; return; }
+    _placeDebounce = setTimeout(async () => {
+      const res = await fetch(serverUrl() + '/api/places?q=' + encodeURIComponent(val), {
+        headers: { 'x-admin-key': key() }
+      });
+      const data = await res.json();
+      if (!data.success || data.data.length === 0) { box.style.display = 'none'; return; }
+      box.innerHTML = data.data.map(p => `
+        <div onclick="selectPlace(${JSON.stringify(p).replace(/"/g, '&quot;')})"
+             style="padding:8px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid #f0f0f0;"
+             onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='white'">
+          <strong>${p.name}</strong> <span style="color:#aaa; font-size:11px;">${[p.neighbourhood, p.type].filter(Boolean).join(' · ')}</span>
+        </div>
+      `).join('');
+      box.style.display = 'block';
+    }, 500);
+  }
+
+  function selectPlace(p) {
+    _selectedPlace = p;
+    document.getElementById('f-place').value = p.name;
+    document.getElementById('place-suggestions').style.display = 'none';
+  }
+
+  function key() { return document.getElementById('adminKey').value; }
+  function serverUrl() { return document.getElementById('serverUrl').value.replace(/\/$/, ''); }
+
+  function showMsg(text, type) {
+    const el = document.getElementById('msg');
+    el.innerHTML = `<div class="msg msg-${type}">${text}</div>`;
+    setTimeout(() => el.innerHTML = '', 3000);
+  }
+
+  async function api(method, path, body) {
+    const res = await fetch(serverUrl() + path, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': key() },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return res.json();
+  }
+
+  async function loadOccasions() {
+    const data = await api('GET', '/admin/api/occasions');
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    const list = data.data;
+    document.getElementById('count').textContent = `(${list.length})`;
+    const tbody = document.getElementById('occasions-list');
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">No occasions yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(o => {
+      const isActive = o.isActive;
+      const rec = o.recurrence || {};
+      const scheduleLabel = () => {
+        const time = `${String(rec.hour).padStart(2,'0')}:${String(rec.minute||0).padStart(2,'0')}`;
+        if (rec.type === 'daily') return `Daily ${time}`;
+        if (rec.type === 'weekly') return `Weekly ${DAYS[rec.dayOfWeek]} ${time}`;
+        if (rec.type === 'fortnightly') return `Fortnightly ${DAYS[rec.dayOfWeek]} ${time}`;
+        if (rec.type === 'monthly' && rec.dateOfMonth) return `Monthly ${rec.dateOfMonth}th ${time}`;
+        if (rec.type === 'monthly') return `Monthly (wk${rec.weekOfMonth} ${DAYS[rec.dayOfWeek]}) ${time}`;
+        return time;
+      };
+      return `
+      <tr>
+        <td><strong>${o.activity}</strong></td>
+        <td>${o.place}</td>
+        <td class="days">${scheduleLabel()}</td>
+        <td>${o.budget}</td>
+        <td><button class="btn btn-toggle ${isActive ? '' : 'inactive'}" onclick="toggleOccasion('${o._id}', ${!isActive})">${isActive ? 'Active' : 'Inactive'}</button></td>
+        <td class="actions">
+          <button class="btn btn-danger" onclick="deleteOccasion('${o._id}')">Delete</button>
+        </td>
+      </tr>
+    `}).join('');
+  }
+
+  function updateRecurrenceFields() {
+    const type = document.getElementById('f-recurrence-type').value;
+    document.getElementById('f-day-wrap').style.display = ['weekly','fortnightly'].includes(type) ? '' : 'none';
+    document.getElementById('f-weekofmonth-wrap').style.display = type === 'monthly' ? '' : 'none';
+    document.getElementById('f-dateofmonth-wrap').style.display = type === 'monthly' ? '' : 'none';
+  }
+  updateRecurrenceFields();
+
+  async function addOccasion() {
+    const type = document.getElementById('f-recurrence-type').value;
+    const excludeRaw = document.getElementById('f-excludedays').value.trim();
+    const excludeDays = excludeRaw ? excludeRaw.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n)) : [];
+    const recurrence = {
+      type,
+      hour: parseInt(document.getElementById('f-hour').value),
+      minute: parseInt(document.getElementById('f-minute').value) || 0,
+      excludeDays,
+    };
+    if (['weekly','fortnightly'].includes(type)) {
+      const d = document.getElementById('f-day').value;
+      recurrence.dayOfWeek = d !== '' ? parseInt(d) : null;
+    }
+    if (type === 'monthly') {
+      const wom = document.getElementById('f-weekofmonth').value;
+      const dom = document.getElementById('f-dateofmonth').value;
+      if (dom) recurrence.dateOfMonth = parseInt(dom);
+      else if (wom) {
+        recurrence.weekOfMonth = parseInt(wom);
+        const d = document.getElementById('f-day').value;
+        recurrence.dayOfWeek = d !== '' ? parseInt(d) : null;
+      }
+    }
+
+    const body = {
+      activity: document.getElementById('f-activity').value.trim(),
+      place: document.getElementById('f-place').value.trim(),
+      neighbourhood: _selectedPlace?.neighbourhood || '',
+      location: _selectedPlace?.location || null,
+      budget: document.getElementById('f-budget').value,
+      recurrence,
+      startDate: document.getElementById('f-startdate').value || null,
+    };
+    if (!body.activity || !body.place || isNaN(recurrence.hour)) {
+      showMsg('Fill in all required fields', 'error'); return;
+    }
+    if (!_selectedPlace) {
+      showMsg('Select a place from the suggestions', 'error'); return;
+    }
+    const data = await api('POST', '/admin/api/occasions', body);
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg('Recurring plan added!', 'success');
+    // clear form
+    ['f-activity','f-place','f-hour','f-day','f-weekofmonth','f-dateofmonth','f-excludedays','f-startdate'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-minute').value = '0';
+    loadOccasions();
+  }
+
+  async function toggleOccasion(id, isActive) {
+    const data = await api('PUT', `/admin/api/occasions/${id}`, { isActive });
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    loadOccasions();
+  }
+
+  async function deleteOccasion(id) {
+    if (!confirm('Delete this occasion?')) return;
+    const data = await api('DELETE', `/admin/api/occasions/${id}`);
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg('Deleted', 'success');
+    loadOccasions();
+  }
+</script>
+</body>
+</html>
