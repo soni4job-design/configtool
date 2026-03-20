@@ -49,7 +49,10 @@
 
 <div class="key-bar">
   <label style="margin:0; font-size:13px;">Server:</label>
-  <input type="text" id="serverUrl" value="http://localhost:3000" style="width:200px;" />
+  <select id="serverUrl" style="width:200px; border:1px solid #ccc; border-radius:6px; padding:6px 10px; font-size:13px;">
+    <option value="http://localhost:3000">Local (localhost:3000)</option>
+    <option value="https://prod.meopel.com">Prod (prod.meopel.com)</option>
+  </select>
   <label style="margin:0; font-size:13px;">Admin Key:</label>
   <input type="password" id="adminKey" placeholder="Enter admin key" />
   <button onclick="loadOccasions()">Load</button>
