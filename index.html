@@ -38,6 +38,12 @@
     .msg-success { background: #e8f5e9; color: #2e7d32; }
     .msg-error { background: #fce4ec; color: #c62828; }
     .days { font-size: 11px; color: #888; }
+    .reason { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #fff3e0; color: #e65100; }
+    .user-cell { display: flex; align-items: center; gap: 8px; }
+    .user-cell img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee; }
+    .user-cell .info { font-size: 13px; }
+    .user-cell .sub { font-size: 11px; color: #999; }
+    .btn-review { background: #e8f5e9; color: #2e7d32; padding: 4px 10px; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -55,7 +61,7 @@
   </select>
   <label style="margin:0; font-size:13px;">Admin Key:</label>
   <input type="password" id="adminKey" placeholder="Enter admin key" />
-  <button onclick="loadOccasions()">Load</button>
+  <button onclick="loadAll()">Load</button>
 </div>
 
 <div class="container">
@@ -122,6 +128,26 @@
     </div>
     <br>
     <button class="btn btn-primary" onclick="addOccasion()">Add Recurring Plan</button>
+  </div>
+
+  <!-- Flagged Users -->
+  <div class="card">
+    <h2>🚩 Flagged Users <span id="flag-count" style="color:#aaa; font-weight:normal;"></span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Flagged User</th>
+          <th>Reported By</th>
+          <th>Reason</th>
+          <th>Note</th>
+          <th>Date</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="flags-list">
+        <tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <!-- Occasions List -->
@@ -194,6 +220,58 @@
       body: body ? JSON.stringify(body) : undefined,
     });
     return res.json();
+  }
+
+  function loadAll() {
+    loadFlags();
+    loadOccasions();
+  }
+
+  async function loadFlags() {
+    const data = await api('GET', '/admin/api/flags');
+    const tbody = document.getElementById('flags-list');
+    if (!data.success) { tbody.innerHTML = `<tr><td colspan="6" style="color:red;">${data.message}</td></tr>`; return; }
+    const flags = data.data;
+    document.getElementById('flag-count').textContent = `(${flags.length})`;
+    if (flags.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">No unreviewed flags</td></tr>';
+      return;
+    }
+    tbody.innerHTML = flags.map(f => {
+      const fu = f.flagged || {};
+      const ru = f.reporter || {};
+      const photo = fu.photos?.[0] || '';
+      const date = new Date(f.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      return `
+      <tr>
+        <td>
+          <div class="user-cell">
+            ${photo ? `<img src="${photo}" onerror="this.style.display='none'">` : '<div style="width:36px;height:36px;border-radius:50%;background:#eee;"></div>'}
+            <div class="info">
+              <div><strong>${fu.name || '—'}</strong>, ${fu.age || '?'} · ${fu.gender || '?'}</div>
+              <div class="sub">${fu.phone || ''}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="info">
+            <div><strong>${ru.name || '—'}</strong>, ${ru.age || '?'}</div>
+            <div class="sub">${ru.phone || ''}</div>
+          </div>
+        </td>
+        <td><span class="reason">${f.reason}</span></td>
+        <td style="font-size:12px; color:#555;">${f.note || '—'}</td>
+        <td style="font-size:12px; color:#999;">${date}</td>
+        <td><button class="btn btn-review" onclick="reviewFlag('${f._id}')">Mark reviewed</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function reviewFlag(id) {
+    const data = await api('PUT', `/admin/api/flags/${id}/review`);
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg('Marked as reviewed', 'success');
+    loadFlags();
   }
 
   async function loadOccasions() {
