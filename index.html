@@ -130,6 +130,24 @@
     <button class="btn btn-primary" onclick="addOccasion()">Add Recurring Plan</button>
   </div>
 
+  <!-- User Feedback -->
+  <div class="card">
+    <h2>💬 User Feedback <span id="feedback-count" style="color:#aaa; font-weight:normal;"></span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Source</th>
+          <th>Message</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody id="feedback-list">
+        <tr><td colspan="4" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
+      </tbody>
+    </table>
+  </div>
+
   <!-- Flagged Users -->
   <div class="card">
     <h2>🚩 Flagged Users <span id="flag-count" style="color:#aaa; font-weight:normal;"></span></h2>
@@ -225,6 +243,33 @@
   function loadAll() {
     loadFlags();
     loadOccasions();
+    loadFeedback();
+  }
+
+  async function loadFeedback() {
+    const data = await api('GET', '/admin/api/feedback');
+    const tbody = document.getElementById('feedback-list');
+    if (!data.success) { tbody.innerHTML = `<tr><td colspan="4" style="color:red;">${data.message}</td></tr>`; return; }
+    const list = data.data;
+    document.getElementById('feedback-count').textContent = `(${list.length})`;
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="color:#aaa; text-align:center; padding:24px;">No feedback yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(f => {
+      const u = f.userId;
+      const date = new Date(f.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const userStr = u ? `<strong>${u.name || '—'}</strong><div class="sub">${u.phone || ''} · ${u.gender || ''}, ${u.age || ''}</div>` : '<span style="color:#aaa;">Anonymous</span>';
+      const sourceBadge = f.source === 'website'
+        ? '<span style="background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">website</span>'
+        : '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">app</span>';
+      return `<tr>
+        <td><div class="info">${userStr}</div></td>
+        <td>${sourceBadge}</td>
+        <td style="white-space:pre-wrap; font-size:13px; max-width:400px;">${f.message}</td>
+        <td style="font-size:12px; color:#999; white-space:nowrap;">${date}</td>
+      </tr>`;
+    }).join('');
   }
 
   async function loadFlags() {
