@@ -148,6 +148,32 @@
     </table>
   </div>
 
+  <!-- Users -->
+  <div class="card">
+    <h2>👤 Users <span id="users-count" style="color:#aaa; font-weight:normal;"></span></h2>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Phone</th><th>Gender</th><th>Age</th><th>Trusted</th><th>Status</th><th>Action</th></tr>
+      </thead>
+      <tbody id="users-list">
+        <tr><td colspan="7" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Active Plans -->
+  <div class="card">
+    <h2>📋 Active Plans <span id="plans-count" style="color:#aaa; font-weight:normal;"></span></h2>
+    <table>
+      <thead>
+        <tr><th>Activity</th><th>Place</th><th>Creator</th><th>Time</th><th>Status</th><th>Action</th></tr>
+      </thead>
+      <tbody id="plans-list">
+        <tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
+      </tbody>
+    </table>
+  </div>
+
   <!-- Flagged Users -->
   <div class="card">
     <h2>🚩 Flagged Users <span id="flag-count" style="color:#aaa; font-weight:normal;"></span></h2>
@@ -241,9 +267,82 @@
   }
 
   function loadAll() {
+    loadUsers();
+    loadAllPlans();
     loadFlags();
     loadOccasions();
     loadFeedback();
+  }
+
+  async function loadUsers() {
+    const data = await api('GET', '/admin/api/users');
+    const tbody = document.getElementById('users-list');
+    if (!data.success) { tbody.innerHTML = `<tr><td colspan="7" style="color:red;">${data.message}</td></tr>`; return; }
+    const users = data.data;
+    document.getElementById('users-count').textContent = `(${users.length})`;
+    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="color:#aaa; text-align:center; padding:24px;">No users</td></tr>'; return; }
+    tbody.innerHTML = users.map(u => {
+      const age = u.birthYear ? new Date().getFullYear() - u.birthYear : '?';
+      const banned = u.isBanned;
+      return `<tr>
+        <td><strong>${u.name || '—'}</strong></td>
+        <td style="font-size:12px; color:#999;">${u.phone || ''}</td>
+        <td>${u.gender || '—'}</td>
+        <td>${age}</td>
+        <td>${u.isTrusted ? '<span style="color:green; font-weight:600;">✓</span>' : '—'}</td>
+        <td>${banned ? '<span style="color:red; font-weight:600;">Banned</span>' : '<span style="color:green;">Active</span>'}</td>
+        <td>
+          ${banned
+            ? `<button class="btn btn-review" onclick="unbanUser('${u._id}')">Unban</button>`
+            : `<button class="btn btn-danger" onclick="banUser('${u._id}')">Ban</button>`}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function banUser(id) {
+    if (!confirm('Ban this user? They will be locked out of the app immediately.')) return;
+    const data = await api('POST', `/admin/api/users/${id}/ban`);
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg(`${data.data.name} banned`, 'success');
+    loadUsers();
+  }
+
+  async function unbanUser(id) {
+    const data = await api('DELETE', `/admin/api/users/${id}/ban`);
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg(`${data.data.name} unbanned`, 'success');
+    loadUsers();
+  }
+
+  async function loadAllPlans() {
+    const data = await api('GET', '/admin/api/all-plans');
+    const tbody = document.getElementById('plans-list');
+    if (!data.success) { tbody.innerHTML = `<tr><td colspan="6" style="color:red;">${data.message}</td></tr>`; return; }
+    const plans = data.data;
+    document.getElementById('plans-count').textContent = `(${plans.length})`;
+    if (plans.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">No active plans</td></tr>'; return; }
+    tbody.innerHTML = plans.map(p => {
+      const creator = p.creator;
+      const time = new Date(p.time).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const statusColor = p.status === 'matched' ? '#2e7d32' : '#1565c0';
+      return `<tr>
+        <td><strong>${p.activity}</strong></td>
+        <td style="font-size:12px;">${p.place}</td>
+        <td><div class="info"><strong>${creator?.name || 'System'}</strong><div class="sub">${creator?.phone || ''}</div></div></td>
+        <td style="font-size:12px; white-space:nowrap;">${time}</td>
+        <td><span style="color:${statusColor}; font-weight:600;">${p.status}</span></td>
+        <td><button class="btn btn-danger" onclick="deletePlan('${p._id}')">Delete</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function deletePlan(id) {
+    if (!confirm('Delete this plan? This will cancel it and notify all joiners.')) return;
+    const data = await api('DELETE', `/admin/api/plans/${id}`);
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg('Plan deleted', 'success');
+    loadAllPlans();
   }
 
   async function loadFeedback() {
