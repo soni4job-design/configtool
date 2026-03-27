@@ -148,6 +148,26 @@
     </table>
   </div>
 
+  <!-- Meetup Ratings -->
+  <div class="card">
+    <h2>⭐ Meetup Ratings <span id="meetup-feedback-count" style="color:#aaa; font-weight:normal;"></span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Plan</th>
+          <th>Rating</th>
+          <th>Feeling</th>
+          <th>Note</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody id="meetup-feedback-list">
+        <tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
+      </tbody>
+    </table>
+  </div>
+
   <!-- Users -->
   <div class="card">
     <h2>👤 Users <span id="users-count" style="color:#aaa; font-weight:normal;"></span></h2>
@@ -272,6 +292,7 @@
     loadFlags();
     loadOccasions();
     loadFeedback();
+    loadMeetupFeedback();
   }
 
   async function loadUsers() {
@@ -343,6 +364,37 @@
     if (!data.success) { showMsg(data.message, 'error'); return; }
     showMsg('Plan deleted', 'success');
     loadAllPlans();
+  }
+
+  async function loadMeetupFeedback() {
+    const data = await api('GET', '/admin/api/meetup-feedback');
+    const tbody = document.getElementById('meetup-feedback-list');
+    if (!data.success) { tbody.innerHTML = `<tr><td colspan="6" style="color:red;">${data.message}</td></tr>`; return; }
+    const list = data.data;
+    document.getElementById('meetup-feedback-count').textContent = `(${list.length})`;
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">No meetup ratings yet</td></tr>';
+      return;
+    }
+    const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+    const feelingColor = { comfortable: '#2e7d32', neutral: '#888', uncomfortable: '#c62828' };
+    tbody.innerHTML = list.map(f => {
+      const u = f.user;
+      const p = f.plan;
+      const date = new Date(f.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const userStr = u ? `<strong>${u.name || '—'}</strong><div style="font-size:11px;color:#999;">${u.phone || ''}</div>` : '<span style="color:#aaa;">—</span>';
+      const planStr = p ? `<strong>${p.activity}</strong><div style="font-size:11px;color:#999;">${p.place}</div>` : '—';
+      const feelingStr = f.feeling ? `<span style="color:${feelingColor[f.feeling] || '#888'}; font-weight:600; font-size:12px;">${f.feeling}</span>` : '—';
+      const noteStr = f.note ? `<span style="color:#c62828; font-size:12px;">${f.note}</span>` : '<span style="color:#ccc;">—</span>';
+      return `<tr>
+        <td>${userStr}</td>
+        <td>${planStr}</td>
+        <td style="color:#f59e0b; font-size:16px; letter-spacing:2px;">${stars(f.rating || 0)}</td>
+        <td>${feelingStr}</td>
+        <td style="max-width:220px; white-space:pre-wrap;">${noteStr}</td>
+        <td style="font-size:12px; color:#999; white-space:nowrap;">${date}</td>
+      </tr>`;
+    }).join('');
   }
 
   async function loadFeedback() {
