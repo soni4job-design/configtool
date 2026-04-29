@@ -44,6 +44,8 @@
     .user-cell .info { font-size: 13px; }
     .user-cell .sub { font-size: 11px; color: #999; }
     .btn-review { background: #e8f5e9; color: #2e7d32; padding: 4px 10px; font-size: 12px; }
+    .btn-tester { background: #e8eaf6; color: #3949ab; padding: 4px 10px; font-size: 12px; }
+    .btn-untester { background: #fff8e1; color: #f57f17; padding: 4px 10px; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -66,6 +68,23 @@
 
 <div class="container">
   <div id="msg"></div>
+
+  <!-- App Config -->
+  <div class="card">
+    <h2>⚙️ App Config</h2>
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <div>
+        <label>Terms &amp; Conditions Version</label>
+        <input id="cfg-terms-version" type="number" min="1" style="width:100px;" placeholder="1" />
+      </div>
+      <div style="padding-top:18px;">
+        <button class="btn btn-primary" onclick="saveAppConfig()">Save</button>
+      </div>
+      <div style="padding-top:18px; font-size:12px; color:#888;">
+        Bump the version number to force all users to re-accept T&amp;C on next login.
+      </div>
+    </div>
+  </div>
 
   <!-- Add Recurring Plan -->
   <div class="card">
@@ -173,10 +192,10 @@
     <h2>👤 Users <span id="users-count" style="color:#aaa; font-weight:normal;"></span></h2>
     <table>
       <thead>
-        <tr><th>Name</th><th>Phone</th><th>Gender</th><th>Age</th><th>Trusted</th><th>Status</th><th>Action</th></tr>
+        <tr><th>Name</th><th>Phone</th><th>Gender</th><th>Age</th><th>Trusted</th><th>Status</th><th>Tester</th><th>Action</th></tr>
       </thead>
       <tbody id="users-list">
-        <tr><td colspan="7" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
+        <tr><td colspan="8" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
       </tbody>
     </table>
   </div>
@@ -209,6 +228,26 @@
         </tr>
       </thead>
       <tbody id="flags-list">
+        <tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Flagged Plans -->
+  <div class="card">
+    <h2>🚩 Reported Plans <span id="plan-flag-count" style="color:#aaa; font-weight:normal;"></span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Plan</th>
+          <th>Reported By</th>
+          <th>Reason</th>
+          <th>Note</th>
+          <th>Date</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="plan-flags-list">
         <tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">Enter admin key and click Load</td></tr>
       </tbody>
     </table>
@@ -290,7 +329,9 @@
     loadUsers();
     loadAllPlans();
     loadFlags();
+    loadPlanFlags();
     loadOccasions();
+    loadAppConfig();
     loadFeedback();
     loadMeetupFeedback();
   }
@@ -298,13 +339,14 @@
   async function loadUsers() {
     const data = await api('GET', '/admin/api/users');
     const tbody = document.getElementById('users-list');
-    if (!data.success) { tbody.innerHTML = `<tr><td colspan="7" style="color:red;">${data.message}</td></tr>`; return; }
+    if (!data.success) { tbody.innerHTML = `<tr><td colspan="8" style="color:red;">${data.message}</td></tr>`; return; }
     const users = data.data;
     document.getElementById('users-count').textContent = `(${users.length})`;
-    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="color:#aaa; text-align:center; padding:24px;">No users</td></tr>'; return; }
+    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="color:#aaa; text-align:center; padding:24px;">No users</td></tr>'; return; }
     tbody.innerHTML = users.map(u => {
       const age = u.birthYear ? new Date().getFullYear() - u.birthYear : '?';
       const banned = u.isBanned;
+      const tester = u.isTestUser;
       return `<tr>
         <td><strong>${u.name || '—'}</strong></td>
         <td style="font-size:12px; color:#999;">${u.phone || ''}</td>
@@ -312,6 +354,12 @@
         <td>${age}</td>
         <td>${u.isTrusted ? '<span style="color:green; font-weight:600;">✓</span>' : '—'}</td>
         <td>${banned ? '<span style="color:red; font-weight:600;">Banned</span>' : '<span style="color:green;">Active</span>'}</td>
+        <td>
+          ${tester
+            ? `<span style="color:#3949ab; font-weight:600; font-size:12px;">🧪 Tester</span>
+               <button class="btn btn-untester" style="margin-left:4px;" onclick="unsetTester('${u._id}')">Remove</button>`
+            : `<button class="btn btn-tester" onclick="setTester('${u._id}')">Set tester</button>`}
+        </td>
         <td>
           ${banned
             ? `<button class="btn btn-review" onclick="unbanUser('${u._id}')">Unban</button>`
@@ -333,6 +381,20 @@
     const data = await api('DELETE', `/admin/api/users/${id}/ban`);
     if (!data.success) { showMsg(data.message, 'error'); return; }
     showMsg(`${data.data.name} unbanned`, 'success');
+    loadUsers();
+  }
+
+  async function setTester(id) {
+    const data = await api('POST', `/admin/api/users/${id}/test-user`);
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg(`${data.data.name} set as tester`, 'success');
+    loadUsers();
+  }
+
+  async function unsetTester(id) {
+    const data = await api('DELETE', `/admin/api/users/${id}/test-user`);
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg(`${data.data.name} removed from testers`, 'success');
     loadUsers();
   }
 
@@ -470,6 +532,52 @@
     loadFlags();
   }
 
+  async function loadPlanFlags() {
+    const data = await api('GET', '/admin/api/plan-flags');
+    const tbody = document.getElementById('plan-flags-list');
+    if (!data.success) { tbody.innerHTML = `<tr><td colspan="6" style="color:red;">${data.message}</td></tr>`; return; }
+    const flags = data.data;
+    document.getElementById('plan-flag-count').textContent = `(${flags.length})`;
+    if (flags.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="color:#aaa; text-align:center; padding:24px;">No unreviewed plan reports</td></tr>';
+      return;
+    }
+    tbody.innerHTML = flags.map(f => {
+      const p = f.plan || {};
+      const ru = f.reporter || {};
+      const date = new Date(f.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const planTime = p.time ? new Date(p.time).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+      return `<tr>
+        <td>
+          <div class="info">
+            <strong>${p.activity || '—'}</strong>
+            <div class="sub">${p.place || ''} · ${planTime}</div>
+          </div>
+        </td>
+        <td>
+          <div class="info">
+            <div><strong>${ru.name || '—'}</strong>, ${ru.age || '?'}</div>
+            <div class="sub">${ru.phone || ''}</div>
+          </div>
+        </td>
+        <td><span class="reason">${f.reason}</span></td>
+        <td style="font-size:12px; color:#555;">${f.note || '—'}</td>
+        <td style="font-size:12px; color:#999;">${date}</td>
+        <td>
+          <button class="btn btn-review" onclick="reviewPlanFlag('${f._id}')">Mark reviewed</button>
+          <button class="btn btn-danger" style="margin-top:4px;" onclick="deletePlan('${p._id}')">Delete plan</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function reviewPlanFlag(id) {
+    const data = await api('PUT', `/admin/api/plan-flags/${id}/review`);
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg('Marked as reviewed', 'success');
+    loadPlanFlags();
+  }
+
   async function loadOccasions() {
     const data = await api('GET', '/admin/api/occasions');
     if (!data.success) { showMsg(data.message, 'error'); return; }
@@ -575,6 +683,20 @@
     if (!data.success) { showMsg(data.message, 'error'); return; }
     showMsg('Deleted', 'success');
     loadOccasions();
+  }
+
+  async function loadAppConfig() {
+    const data = await api('GET', '/admin/api/config');
+    if (!data.success) return;
+    document.getElementById('cfg-terms-version').value = data.data.termsVersion;
+  }
+
+  async function saveAppConfig() {
+    const termsVersion = parseInt(document.getElementById('cfg-terms-version').value);
+    if (isNaN(termsVersion) || termsVersion < 1) { showMsg('Terms version must be a positive number', 'error'); return; }
+    const data = await api('PUT', '/admin/api/config', { termsVersion });
+    if (!data.success) { showMsg(data.message, 'error'); return; }
+    showMsg(`Terms version updated to ${data.data.termsVersion} — all users will be shown T&C on next login`, 'success');
   }
 </script>
 </body>
